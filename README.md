@@ -87,6 +87,8 @@ Print a value:
 
 ![](stack6.png)
 
+> Veuillez noter que `0x40 = 64` et `char buffer[64]`. On réserve 64 octets.
+
 ## Exploitation
 
 Sur [ce site](http://shell-storm.org/shellcode/files/shellcode-827.php)
