@@ -13,9 +13,14 @@
 Représentation:
 
 ![](stack1.png)
+
 ![](stack2.png)
+
 ![](stack3.png)
+
 ![](stack4.png)
+
 ![](stack5.png)
+
 ![](stack6.png)
 
