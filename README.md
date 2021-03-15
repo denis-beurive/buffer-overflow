@@ -123,5 +123,6 @@ Pour connaître l'adresse du code qui contient l'exploit:
 
 	x/1000s $esp
 
-
+> **Attention !!!** cette commande va affiche l'addresse de début de la chaîne "`MA_VARIABLE=...`".
+> Il faut ajouter `strlen("MA_VARIABLE=")` à l'adresse afficher pour obtenir l'adresse de début du code à exécuter.
 
