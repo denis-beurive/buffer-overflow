@@ -564,6 +564,65 @@ Ceci donne:
 	TOTO080496388A8A8A8A <->  135
 
 
+# format3
+
+	(gdb) print &target
+	$1 = (int *) 0x80496f4
+
+	(gdb) break printf
+	Breakpoint 1 at 0x804837c
+
+Start:
+
+	(gdb) r
+	Starting program: /opt/protostar/bin/format3 
+	AAAA
+
+	Breakpoint 1, __printf (format=0xbfffe570 "AAAA\n") at printf.c:29
+	29	printf.c: No such file or directory.
+		in printf.c
+
+Get the address of the argument passed to the function!
+
+	(gdb) info frame
+	Stack level 0, frame at 0xbfffe540:
+	 eip = 0xb7eddfa2 in __printf (printf.c:29); saved eip 0x8048465
+	 called by frame at 0xbfffe560
+	 source language c.
+	 Arglist at 0xbfffe538, args: format=0xbfffe570 "AAAA\n"
+	 Locals at 0xbfffe538, Previous frame's sp is 0xbfffe540
+	 Saved registers:
+	  ebx at 0xbfffe534, ebp at 0xbfffe538, eip at 0xbfffe53c
+
+=> l'adresse du premier (et seul) argument est `0xbfffe570`.
+
+On affiche la stack:
+
+	(gdb) x/3xw  0xbfffe538
+	0xbfffe538:	0xbfffe558	0x08048465	0xbfffe570
+	(gdb) x/x 0x08048465
+	0x8048465 <printbuffer+17>:	0x8955c3c9
+	(gdb) x/x 0xbfffe558
+	0xbfffe558:	0xbfffe778
+	(gdb) x/x 0xbfffe570
+	0xbfffe570:	0x41414141
+
+On reconnait "AAAA" => `0x41414141`
+
+=> donc l'adresse à modifier est `0xbfffe570`.
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # Good links
 
