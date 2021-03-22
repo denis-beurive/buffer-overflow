@@ -491,7 +491,7 @@ Réponse:
 
 ## Présentation
 
-[](https://web.archive.org/web/20140405143000/http://exploit-exercises.com/protostar/format1)
+[Lien](https://web.archive.org/web/20140405143000/http://exploit-exercises.com/protostar/format1)
 
 ## Exploitation
 
@@ -566,6 +566,8 @@ Ceci donne:
 
 # format3
 
+[Lien](https://web.archive.org/web/20140405143126/http://exploit-exercises.com/protostar/format3)
+
 	(gdb) print &target
 	$1 = (int *) 0x80496f4
 
@@ -611,8 +613,39 @@ On reconnait "AAAA" => `0x41414141`
 
 => donc l'adresse à modifier est `0xbfffe570`.
 
+# Format 4
+
+[Lien](https://web.archive.org/web/20140405142914/http://exploit-exercises.com/protostar/format4)
+
+On suit l'aide:
+
+	user@protostar:/opt/protostar/bin$ objdump -TR format4
+
+	format4:     file format elf32-i386
+
+	DYNAMIC SYMBOL TABLE:
+	00000000  w   D  *UND*	00000000              __gmon_start__
+	00000000      DF *UND*	00000000  GLIBC_2.0   fgets
+	00000000      DF *UND*	00000000  GLIBC_2.0   __libc_start_main
+	00000000      DF *UND*	00000000  GLIBC_2.0   _exit
+	00000000      DF *UND*	00000000  GLIBC_2.0   printf
+	00000000      DF *UND*	00000000  GLIBC_2.0   puts
+	00000000      DF *UND*	00000000  GLIBC_2.0   exit
+	080485ec g    DO .rodata	00000004  Base        _IO_stdin_used
+	08049730 g    DO .bss	00000004  GLIBC_2.0   stdin
 
 
+	DYNAMIC RELOCATION RECORDS
+	OFFSET   TYPE              VALUE 
+	080496fc R_386_GLOB_DAT    __gmon_start__
+	08049730 R_386_COPY        stdin
+	0804970c R_386_JUMP_SLOT   __gmon_start__
+	08049710 R_386_JUMP_SLOT   fgets
+	08049714 R_386_JUMP_SLOT   __libc_start_main
+	08049718 R_386_JUMP_SLOT   _exit
+	0804971c R_386_JUMP_SLOT   printf
+	08049720 R_386_JUMP_SLOT   puts
+	08049724 R_386_JUMP_SLOT   exit
 
 
 
@@ -628,4 +661,5 @@ On reconnait "AAAA" => `0x41414141`
 
 * [https://louisrli.github.io/blog/2012/08/29/protostar-format0/#.YFC_DSXjKV4](https://louisrli.github.io/blog/2012/08/29/protostar-format0/#.YFC_DSXjKV4)
 * [https://github.com/z3tta/Exploit-Exercises-Protostar/blob/master/10-Format2.md](https://github.com/z3tta/Exploit-Exercises-Protostar/blob/master/10-Format2.md)
-
+* [https://gist.github.com/tehmoon/63729359f0a6a45712691f1b06d8971b](https://gist.github.com/tehmoon/63729359f0a6a45712691f1b06d8971b)
+* [https://github.com/le91688/protostar](https://github.com/le91688/protostar)
