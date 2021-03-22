@@ -647,6 +647,12 @@ On suit l'aide:
 	08049720 R_386_JUMP_SLOT   puts
 	08049724 R_386_JUMP_SLOT   exit
 
+Voir une correction sur un lien intéressant... (section "Good links").
+
+# Heap 0
+
+* [Lien](http://exploit-exercises.com/protostar/heap0)
+* [Explication](https://www.ayrx.me/protostar-walkthrough-heap)
 
 
 
@@ -663,3 +669,4 @@ On suit l'aide:
 * [https://github.com/z3tta/Exploit-Exercises-Protostar/blob/master/10-Format2.md](https://github.com/z3tta/Exploit-Exercises-Protostar/blob/master/10-Format2.md)
 * [https://gist.github.com/tehmoon/63729359f0a6a45712691f1b06d8971b](https://gist.github.com/tehmoon/63729359f0a6a45712691f1b06d8971b)
 * [https://github.com/le91688/protostar](https://github.com/le91688/protostar)
+* [https://www.ayrx.me/protostar-walkthrough-heap](https://www.ayrx.me/protostar-walkthrough-heap)
